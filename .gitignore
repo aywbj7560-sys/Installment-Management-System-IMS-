@@ -1,0 +1,19 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+.vscode/
+appsettings.Development.json
+appsettings.Local.json
+*.log
+local secrets
+temporary build artifacts
+
+# Avoid tracking local workarounds if they were created
+dotnet-sdk.zip
+setup.ps1
+.dotnet/
+.env
+.env.*
+!.env.example

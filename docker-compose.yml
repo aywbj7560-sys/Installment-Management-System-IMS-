@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16
+    container_name: ims_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - ims_postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/indexes.sql:/docker-entrypoint-initdb.d/02-indexes.sql:ro
+      - ./database/seed_roles.sql:/docker-entrypoint-initdb.d/03-seed-roles.sql:ro
+    healthcheck:
+      # TCP is available only after the first-run SQL initialization has finished.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ims_api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:?Set POSTGRES_DB in .env};Username=${POSTGRES_USER:?Set POSTGRES_USER in .env};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
+    ports:
+      - "127.0.0.1:${IMS_API_PORT:-8081}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  ims_postgres_data:
+    name: ims_postgres_data
+
+# Normal stop: docker compose down (preserves database data).
+# Optional full development reset: docker compose down -v
+# WARNING: -v deletes the database volume and all its data.
+# SQL initialization runs only when the PostgreSQL data directory is empty.

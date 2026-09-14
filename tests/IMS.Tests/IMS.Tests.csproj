@@ -17,6 +17,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.22" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="8.0.22" />
     <Using Include="Xunit" />
   </ItemGroup>
 
@@ -26,6 +28,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\IMS.Application\IMS.Application.csproj" />
+    <ProjectReference Include="..\..\src\IMS.API\IMS.API.csproj" />
     <ProjectReference Include="..\..\src\IMS.Domain\IMS.Domain.csproj" />
     <ProjectReference Include="..\..\src\IMS.Infrastructure\IMS.Infrastructure.csproj" />
   </ItemGroup>

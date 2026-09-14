@@ -28,6 +28,12 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_HTTP_PORTS: "8080"
+      Jwt__Key: ${Jwt__Key:?Set Jwt__Key in .env}
+      Jwt__Issuer: ${Jwt__Issuer:-IMS}
+      Jwt__Audience: ${Jwt__Audience:-IMS.API}
+      Jwt__ExpirationMinutes: ${Jwt__ExpirationMinutes:-30}
+      SeedAdmin__Email: ${SeedAdmin__Email:-}
+      SeedAdmin__Password: ${SeedAdmin__Password:-}
       ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:?Set POSTGRES_DB in .env};Username=${POSTGRES_USER:?Set POSTGRES_USER in .env};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
     ports:
       - "127.0.0.1:${IMS_API_PORT:-8081}:8080"

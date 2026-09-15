@@ -23,5 +23,6 @@ await using (var scope = app.Services.CreateAsyncScope())
 app.MapGet("/", () => "IMS API is running");
 app.MapDatabaseHealthEndpoint();
 app.MapAuthenticationEndpoints();
+app.MapCustomerEndpoints();
 
 app.Run();

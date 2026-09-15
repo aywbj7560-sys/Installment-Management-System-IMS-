@@ -24,5 +24,6 @@ app.MapGet("/", () => "IMS API is running");
 app.MapDatabaseHealthEndpoint();
 app.MapAuthenticationEndpoints();
 app.MapCustomerEndpoints();
+app.MapProductEndpoints();
 
 app.Run();

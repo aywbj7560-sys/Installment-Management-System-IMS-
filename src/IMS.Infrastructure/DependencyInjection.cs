@@ -39,6 +39,7 @@ public static class DependencyInjection
         services.AddDbContext<ImsDbContext>(options =>
             options.UseNpgsql(settings.ConnectionString));
         services.AddScoped<IMS.Application.Customers.ICustomerService, IMS.Infrastructure.Customers.CustomerService>();
+        services.AddScoped<IMS.Application.Products.IProductService, IMS.Infrastructure.Products.ProductService>();
         return services;
     }
 }

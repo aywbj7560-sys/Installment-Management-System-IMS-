@@ -25,5 +25,6 @@ app.MapDatabaseHealthEndpoint();
 app.MapAuthenticationEndpoints();
 app.MapCustomerEndpoints();
 app.MapProductEndpoints();
+app.MapContractEndpoints();
 
 app.Run();

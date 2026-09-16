@@ -45,6 +45,7 @@ public static class DependencyInjection
         services.AddScoped<IMS.Application.Guarantors.IGuarantorService, IMS.Infrastructure.Guarantors.GuarantorService>();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<IMS.Application.Installments.IInstallmentService, IMS.Infrastructure.Installments.InstallmentService>();
+        services.AddScoped<IMS.Application.Reports.IReportService, IMS.Infrastructure.Reports.ReportService>();
         return services;
     }
 }

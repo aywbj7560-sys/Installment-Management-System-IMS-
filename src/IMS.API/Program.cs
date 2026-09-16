@@ -27,5 +27,6 @@ app.MapCustomerEndpoints();
 app.MapProductEndpoints();
 app.MapContractEndpoints();
 app.MapPaymentEndpoints();
+app.MapGuarantorEndpoints();
 
 app.Run();

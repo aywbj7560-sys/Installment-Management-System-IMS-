@@ -43,6 +43,8 @@ public static class DependencyInjection
         services.AddScoped<IMS.Application.Contracts.IContractService, IMS.Infrastructure.Contracts.ContractService>();
         services.AddScoped<IMS.Application.Payments.IPaymentService, IMS.Infrastructure.Payments.PaymentService>();
         services.AddScoped<IMS.Application.Guarantors.IGuarantorService, IMS.Infrastructure.Guarantors.GuarantorService>();
+        services.AddSingleton(TimeProvider.System);
+        services.AddScoped<IMS.Application.Installments.IInstallmentService, IMS.Infrastructure.Installments.InstallmentService>();
         return services;
     }
 }

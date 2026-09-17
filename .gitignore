@@ -17,3 +17,9 @@ setup.ps1
 .env
 .env.*
 !.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo

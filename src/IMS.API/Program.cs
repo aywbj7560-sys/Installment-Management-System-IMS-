@@ -5,6 +5,10 @@ using IMS.Infrastructure.Authentication;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddInfrastructure(builder.Configuration.GetConnectionString("DefaultConnection"));
 builder.Services.AddImsAuthentication(builder.Configuration);
+builder.Services.AddCors(options => options.AddPolicy("Frontend", policy => policy
+    .WithOrigins(builder.Configuration["Frontend:Origin"] ?? "http://localhost:5173")
+    .AllowAnyHeader()
+    .AllowAnyMethod()));
 var app = builder.Build();
 
 // Always use a generic error response, including in Development; never expose DB details.
@@ -13,6 +17,7 @@ app.UseExceptionHandler(handler => handler.Run(async context =>
     context.Response.StatusCode = 500;
     await context.Response.WriteAsJsonAsync(new { message = "An unexpected error occurred." });
 }));
+app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();

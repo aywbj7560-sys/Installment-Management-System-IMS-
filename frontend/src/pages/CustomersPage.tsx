@@ -1,0 +1,18 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { getCustomers } from '../api/customers';
+import { useAuth } from '../auth/AuthContext';
+import { CustomerStatusBadge } from '../components/CustomerStatusBadge';
+import { Pagination } from '../components/Pagination';
+import { customerStatuses, type CustomerPage, type CustomerStatus } from '../types/customers';
+import { canManageCustomers } from '../utils/roles';
+export function CustomersPage() {
+  const { token, user } = useAuth(); const [search, setSearch] = useState(''); const [query, setQuery] = useState(''); const [status, setStatus] = useState<CustomerStatus | ''>(''); const [page, setPage] = useState(1); const [data, setData] = useState<CustomerPage>(); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
+  useEffect(() => { const timer = setTimeout(() => { setQuery(search.trim()); setPage(1); }, 350); return () => clearTimeout(timer); }, [search]);
+  useEffect(() => { if (!token) return; let active = true; setLoading(true); setError(''); getCustomers({ search: query || undefined, status: status || undefined, page, pageSize: 10 }, token).then(result => { if (active) setData(result); }).catch(() => { if (active) setError('Customers could not be loaded. Please try again.'); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, [token, query, status, page]);
+  const reset = () => { setSearch(''); setQuery(''); setStatus(''); setPage(1); };
+  return <section><div className="page-title"><div><p className="eyebrow">Customer management</p><h1>Customers</h1><p>View and manage customer identity and contact information.</p></div>{user && canManageCustomers(user.role) && <Link className="button-link primary" to="/customers/new">Create customer</Link>}</div>
+    <div className="panel filters"><label>Search<input aria-label="Search customers" value={search} maxLength={150} placeholder="Name, ID, phone, email…" onChange={e => setSearch(e.target.value)} /></label><label>Status<select aria-label="Customer status" value={status} onChange={e => { setStatus(e.target.value as CustomerStatus | ''); setPage(1); }}><option value="">All statuses</option>{customerStatuses.map(item => <option key={item}>{item}</option>)}</select></label><button className="secondary" onClick={reset}>Clear filters</button></div>
+    {loading ? <div className="inline-state">Loading customers…</div> : error ? <div className="panel error-state" role="alert"><h2>Unable to load customers</h2><p>{error}</p><button className="secondary" onClick={() => setPage(current => current)}>Try again</button></div> : !data?.items.length ? <div className="panel empty-state"><h2>No customers found</h2><p>Try changing the search or status filter.</p></div> : <div className="panel table-panel"><div className="table-scroll"><table><thead><tr><th>ID</th><th>Full name</th><th>Identification</th><th>Phone</th><th>Secondary phone</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead><tbody>{data.items.map(customer => <tr key={customer.customerId}><td>{customer.customerId}</td><td><Link to={`/customers/${customer.customerId}`}>{customer.fullName}</Link></td><td>{customer.identificationNumber}</td><td>{customer.phone}</td><td>{customer.secondaryPhone || '—'}</td><td>{customer.email || '—'}</td><td><CustomerStatusBadge status={customer.status} /></td><td className="actions"><Link to={`/customers/${customer.customerId}`}>View</Link>{user && canManageCustomers(user.role) && <Link to={`/customers/${customer.customerId}/edit`}>Edit</Link>}</td></tr>)}</tbody></table></div><Pagination page={data.page} pageSize={data.pageSize} totalCount={data.totalCount} onPage={setPage} /></div>}
+  </section>;
+}

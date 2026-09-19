@@ -100,9 +100,11 @@ names; InstallmentStatus.PartiallyPaid explicitly converts to/from "Partially Pa
 The SQL contract-to-installment foreign key always uses ON DELETE CASCADE; the
 mapping follows SQL rather than the ERD's proposed status-dependent behavior.
 The existing checks fix number_of_installments at 12 and constrain installment
-numbers to 1..12. They do not generate or guarantee 12 child rows. Exactly 12 rows,
-the mandatory guarantor at activation, and payment allocation totals remain
-future business-layer requirements. No business operations are implemented here.
+numbers to 1..12. They do not themselves generate or guarantee 12 child rows.
+Contract creation generates twelve rows and a mandatory guarantor link; Draft
+activation revalidates those relationships and their financial reconciliation
+before changing only the contract status. Payment allocation totals remain
+business-layer responsibilities rather than database-generated behavior.
 
 ### Configuration and Docker networking
 
@@ -139,7 +141,7 @@ docker compose port api 8080
 
 GET / still returns "IMS API is running". In Development only, GET /health/database
 uses CanConnectAsync and zero-row SELECTs built from EF metadata to verify ims_db
-and all 11 mapped tables/columns. It returns HTTP 200 with
+and all 12 mapped tables/columns. It returns HTTP 200 with
 `{"database":"connected"}` or HTTP 503 with `{"database":"unavailable"}`.
 It reads no business rows and returns no database or credential details. Production
 does not expose this endpoint.

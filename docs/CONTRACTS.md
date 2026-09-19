@@ -5,8 +5,21 @@
 - POST /api/contracts: creates a Draft, its items, mandatory guarantor relation, and exactly twelve installments. Admin, Financial Manager, Sales Agent (permission matrix / FR-006).
 - GET /api/contracts: all five existing roles; pagination (page default 1, pageSize default 50, maximum 100), search (case-insensitive literal contract number/customer name, maximum 150 characters), customerId, status. Filters combine with AND. Deterministic contract-ID order. Response: items, totalCount, page, pageSize.
 - GET /api/contracts/{id}: all five roles; contract/customer summary, locked item prices with product summaries, guarantor profiles, and ordered installment schedule.
+- POST /api/contracts/{id}/activate: changes a valid Draft to Active and returns updated details. Admin and Financial Manager only.
 
-No PUT or activation endpoint: the documentation does not define general editable fields. Activation requires down-payment verification, outside this creation-only stage. Existing JWT validation and role policies remain intact; createdByUserId comes from the signed subject claim and must identify an active existing user. Collection Officer reads support the documented customer schedule lookup responsibility; it cannot create contracts.
+There is no general PUT/status endpoint. Activation is a dedicated operation; Voided and Defaulted workflows remain out of scope. Existing JWT validation and role policies remain intact; createdByUserId comes from the signed subject claim and must identify an active existing user. Collection Officer reads support the documented customer schedule lookup responsibility; it cannot create contracts or activate them.
+
+## Draft activation
+
+`POST /api/contracts/{id}/activate` accepts `downPaymentConfirmed` (required true), optional `reference` (maximum 100 characters), and optional `note`. Unknown fields are rejected. The authenticated JWT subject supplies the activating user and the server supplies the UTC timestamp; clients cannot supply status, user, amount, or activation time.
+
+Activation locks the contract row in a database transaction. Only Draft may transition to Active. Active returns 409 as already active; Completed, Voided, and Defaulted return 409 as invalid source states. Two concurrent attempts cannot both succeed: the row lock serializes them, and a unique audit action/target constraint provides a second safeguard. Repeated activation is a conflict, not an idempotent success.
+
+Before changing status, the service requires the customer, the single linked guarantor, and every referenced product to still exist and be active. It validates at least one internally consistent item, consistent total/down-payment/remaining amounts, and exactly twelve Pending installments numbered 1 through 12 whose positive amounts and remaining balances reconcile exactly to the contract remaining amount. Any eligibility or aggregate-integrity failure returns 409.
+
+The existing schedule is validated and preserved. Activation changes only `contracts.status` from Draft to Active. It does not change contract dates or financial terms, rebuild installments, shift due dates, modify items/prices or guarantor links, or create a Payment/PaymentAllocation for the down payment. `downPaymentConfirmed` records explicit confirmation for this operation; down payment remains a contract pricing term reducing financed principal.
+
+The same transaction inserts exactly one append-only `audit_logs` row with action `ContractActivated`, target type `Contract`, contract ID, activating user, server UTC timestamp, Draft/Active states and optional reference/note. A failure rolls back both status and audit writes. No public audit CRUD API exists.
 
 ## Request example
 
@@ -39,6 +52,7 @@ Alternatively replace guarantor with guarantorId to associate an existing active
 - guarantors: guarantor_id, full_name, identification_number, phone, secondary_phone, address, occupation, workplace, notes, is_active, created_at.
 - contract_guarantors: contract_guarantor_id, contract_id, guarantor_id, notes, created_at.
 - installments: installment_id, contract_id, installment_number, due_date, amount, paid_amount, remaining_amount, status.
+- audit_logs: audit_log_id, user_id, action_type, target_entity_type, target_entity_id, timestamp, previous_state, new_state, reference, note.
 
 Customer/product existence and availability use existing customer status/product is_active. Database-generated IDs and creation timestamps remain database-owned. Existing entity classes, mappings, SQL schema, and indexes are unchanged.
 

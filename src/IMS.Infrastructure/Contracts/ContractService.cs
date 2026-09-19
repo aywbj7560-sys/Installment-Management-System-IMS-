@@ -9,6 +9,7 @@ namespace IMS.Infrastructure.Contracts;
 
 public sealed class ContractService(ImsDbContext db) : IContractService
 {
+    private const string ActivationAction = "ContractActivated";
     public async Task<ContractResult> CreateAsync(ContractRequest request,long userId,CancellationToken ct)
     {
         if(request.Validate().Count>0) return new(null,400,"Invalid contract request.");
@@ -74,6 +75,69 @@ public sealed class ContractService(ImsDbContext db) : IContractService
         var count=await query.CountAsync(ct);
         var rows=await query.Include(x=>x.Customer).OrderBy(x=>x.ContractId).Skip((page-1)*pageSize).Take(pageSize).ToListAsync(ct);
         return new(rows.Select(Summary).ToArray(),count,page,pageSize);
+    }
+    public async Task<ContractResult> ActivateAsync(long id,ActivateContractRequest request,long userId,CancellationToken ct)
+    {
+        if(request.Validate().Count>0) return new(null,400,"Down payment confirmation is required.");
+        await using var transaction=db.Database.IsRelational()
+            ? await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted,ct) : null;
+        try
+        {
+            var contract=db.Database.IsRelational()
+                ? await db.Contracts.FromSqlInterpolated($"SELECT * FROM public.contracts WHERE contract_id = {id} FOR UPDATE").SingleOrDefaultAsync(ct)
+                : await db.Contracts.SingleOrDefaultAsync(x=>x.ContractId==id,ct);
+            if(contract is null) return new(null,404,"Contract not found.");
+            if(contract.Status==ContractStatus.Active) return new(null,409,"Contract is already active.");
+            if(contract.Status!=ContractStatus.Draft) return new(null,409,$"Contract cannot be activated from its current {contract.Status} state.");
+            if(!await db.Users.AsNoTracking().AnyAsync(x=>x.UserId==userId&&x.IsActive,ct)) return new(null,403,"Contract activator is unavailable.");
+            if(!await db.Customers.AsNoTracking().AnyAsync(x=>x.CustomerId==contract.CustomerId&&x.Status==CustomerStatus.Active,ct))
+                return new(null,409,"Contract customer must exist and be active.");
+
+            var items=await db.ContractItems.AsNoTracking().Where(x=>x.ContractId==id).ToListAsync(ct);
+            if(items.Count==0||items.Select(x=>x.ProductId).Distinct().Count()!=items.Count||items.Any(x=>x.Quantity<=0||!ContractValidation.Money(x.UnitPrice)||!ContractValidation.Money(x.Subtotal)||x.Subtotal!=x.UnitPrice*x.Quantity))
+                return new(null,409,"Contract item integrity validation failed.");
+            var productIds=items.Select(x=>x.ProductId).ToArray();
+            var products=await db.Products.AsNoTracking().Where(x=>productIds.Contains(x.ProductId)).ToListAsync(ct);
+            if(products.Count!=productIds.Length||products.Any(x=>!x.IsActive)) return new(null,409,"All contract products must exist and be active.");
+
+            var links=await db.ContractGuarantors.AsNoTracking().Where(x=>x.ContractId==id).ToListAsync(ct);
+            if(links.Count!=1) return new(null,409,"Contract guarantor integrity validation failed.");
+            if(!await db.Guarantors.AsNoTracking().AnyAsync(x=>x.GuarantorId==links[0].GuarantorId&&x.IsActive,ct))
+                return new(null,409,"Contract guarantor must exist and be active.");
+
+            if(!ContractValidation.Money(contract.TotalAmount)||contract.TotalAmount<=0||!ContractValidation.Money(contract.DownPayment)||
+                !ContractValidation.Money(contract.RemainingAmount)||contract.TotalAmount-contract.DownPayment!=contract.RemainingAmount||
+                items.Sum(x=>x.Subtotal)!=contract.TotalAmount||contract.NumberOfInstallments!=12)
+                return new(null,409,"Contract financial integrity validation failed.");
+
+            var installments=await db.Installments.AsNoTracking().Where(x=>x.ContractId==id).OrderBy(x=>x.InstallmentNumber).ToListAsync(ct);
+            if(installments.Count!=12||!installments.Select(x=>x.InstallmentNumber).SequenceEqual(Enumerable.Range(1,12))||
+                installments.Any(x=>x.Status!=InstallmentStatus.Pending||!ContractValidation.Money(x.Amount)||x.Amount<=0||x.PaidAmount!=0||x.RemainingAmount!=x.Amount)||
+                installments.Sum(x=>x.Amount)!=contract.RemainingAmount||installments.Sum(x=>x.RemainingAmount)!=contract.RemainingAmount)
+                return new(null,409,"Contract installment schedule integrity validation failed.");
+
+            contract.Status=ContractStatus.Active;
+            db.AuditLogs.Add(new AuditLog { UserId=userId,ActionType=ActivationAction,TargetEntityType="Contract",TargetEntityId=id,
+                Timestamp=DateTime.UtcNow,PreviousState=ContractStatus.Draft.ToString(),NewState=ContractStatus.Active.ToString(),
+                Reference=Optional(request.Reference),Note=Optional(request.Note) });
+            await db.SaveChangesAsync(ct);
+            var result=await GetAsync(id,ct);
+            if(transaction is not null) await transaction.CommitAsync(ct);
+            return new(result);
+        }
+        catch(DbUpdateException ex) when(ex.InnerException is PostgresException
+            { SqlState: PostgresErrorCodes.UniqueViolation,ConstraintName:"uq_audit_logs_action_target" })
+        {
+            if(transaction is not null) await transaction.RollbackAsync(CancellationToken.None);
+            db.ChangeTracker.Clear();
+            return new(null,409,"Contract activation has already been completed.");
+        }
+        catch
+        {
+            if(transaction is not null) await transaction.RollbackAsync(CancellationToken.None);
+            db.ChangeTracker.Clear();
+            throw;
+        }
     }
     public async Task<ContractDetails?> GetAsync(long id,CancellationToken ct)
     {

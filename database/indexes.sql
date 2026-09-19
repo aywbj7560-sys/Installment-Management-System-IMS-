@@ -71,3 +71,8 @@ CREATE INDEX idx_payments_payment_date ON payments(payment_date);
 -- Note: (payment_id, installment_id) is already indexed by uq_payment_allocations_payment_installment.
 -- Indexing installment_id for reverse allocation lookups per installment.
 CREATE INDEX idx_payment_allocations_installment_id ON payment_allocations(installment_id);
+
+-- -----------------------------------------------------------------------------
+-- AUDIT LOG INDEXES
+-- -----------------------------------------------------------------------------
+CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);

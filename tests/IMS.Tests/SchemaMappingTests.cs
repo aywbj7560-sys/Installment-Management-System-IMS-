@@ -21,7 +21,7 @@ public class SchemaMappingTests
         using var context = CreateContext();
         var schema = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Schema", "schema.sql"));
         var tables = Regex.Matches(schema, @"CREATE TABLE (\w+) \((.*?)\r?\n\);", RegexOptions.Singleline);
-        Assert.Equal(11, tables.Count);
+        Assert.Equal(12, tables.Count);
         Assert.Equal(tables.Count, context.Model.GetEntityTypes().Count());
 
         foreach (Match table in tables)
@@ -88,7 +88,7 @@ public class SchemaMappingTests
             }
         }
 
-        Assert.Equal(12, context.Model.GetEntityTypes().Sum(e => e.GetForeignKeys().Count()));
+        Assert.Equal(13, context.Model.GetEntityTypes().Sum(e => e.GetForeignKeys().Count()));
     }
 
     [Theory]

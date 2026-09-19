@@ -52,19 +52,20 @@ public class ContractTests
 
 
     [Theory]
-    [InlineData(null,401,401)]
-    [InlineData(RoleNames.Admin,200,201)]
-    [InlineData(RoleNames.FinancialManager,200,201)]
-    [InlineData(RoleNames.SalesAgent,200,201)]
-    [InlineData(RoleNames.CollectionOfficer,200,403)]
-    [InlineData(RoleNames.Auditor,200,403)]
-    [InlineData("Unknown",403,403)]
-    public async Task Roles(string? role,int read,int write)
+    [InlineData(null,401,401,401)]
+    [InlineData(RoleNames.Admin,200,201,200)]
+    [InlineData(RoleNames.FinancialManager,200,201,200)]
+    [InlineData(RoleNames.SalesAgent,200,201,403)]
+    [InlineData(RoleNames.CollectionOfficer,200,403,403)]
+    [InlineData(RoleNames.Auditor,200,403,403)]
+    [InlineData("Unknown",403,403,403)]
+    public async Task Roles(string? role,int read,int write,int activate)
     {
         await using var app=await Host(); using var client=Client(app,role);
         Assert.Equal(read,(int)(await client.GetAsync("/api/contracts")).StatusCode);
         Assert.Equal(read,(int)(await client.GetAsync("/api/contracts/1")).StatusCode);
         Assert.Equal(write,(int)(await client.PostAsJsonAsync("/api/contracts",Valid())).StatusCode);
+        Assert.Equal(activate,(int)(await client.PostAsJsonAsync("/api/contracts/1/activate",new ActivateContractRequest { DownPaymentConfirmed=true })).StatusCode);
     }
     public static ContractRequest Valid()=>new() { ContractNumber="test",CustomerId=1,ContractDate=new DateTimeOffset(2028,1,31,0,0,0,TimeSpan.Zero),Items=[new(1,1,100m)],GuarantorId=1 };
     [Theory]
@@ -88,6 +89,13 @@ public class ContractTests
         Assert.Equal(HttpStatusCode.BadRequest,(await client.GetAsync("/api/contracts?"+query)).StatusCode);
     }
     [Fact]
+    public async Task ActivationRequiresExplicitConfirmationAndRejectsUnknownFields()
+    {
+        await using var app=await Host();using var client=Client(app,RoleNames.Admin);
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.PostAsJsonAsync("/api/contracts/1/activate",new ActivateContractRequest())).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.PostAsync("/api/contracts/1/activate",new StringContent("{\"downPaymentConfirmed\":true,\"status\":\"Active\"}",System.Text.Encoding.UTF8,"application/json"))).StatusCode);
+    }
+    [Fact]
     public void ValidationAndSchedule()
     {
         Assert.Empty(Valid().Validate());
@@ -103,6 +111,7 @@ public sealed class StubContractService : IContractService
 {
     private static ContractDetails Details()=>new(new(1,"test",1,"Customer",1,DateTime.UtcNow,100,0,100,12,"Draft",DateTime.UtcNow),[],[],[]);
     public Task<ContractResult> CreateAsync(ContractRequest r,long userId,CancellationToken ct)=>Task.FromResult(new ContractResult(Details()));
+    public Task<ContractResult> ActivateAsync(long id,ActivateContractRequest r,long userId,CancellationToken ct)=>Task.FromResult(new ContractResult(Details()));
     public Task<ContractDetails?> GetAsync(long id,CancellationToken ct)=>Task.FromResult<ContractDetails?>(Details());
     public Task<ContractPage> ListAsync(string? search,long? customerId,IMS.Domain.Enums.ContractStatus? status,int page,int pageSize,CancellationToken ct)=>Task.FromResult(new ContractPage([],0,page,pageSize));
 }

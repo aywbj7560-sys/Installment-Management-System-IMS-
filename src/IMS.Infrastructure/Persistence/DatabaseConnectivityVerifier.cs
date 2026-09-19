@@ -15,7 +15,7 @@ public static class DatabaseConnectivityVerifier
                 return false;
 
             var entities = context.Model.GetEntityTypes().ToArray();
-            if (entities.Length != 11)
+            if (entities.Length != 12)
                 return false;
 
             await context.Database.OpenConnectionAsync(cancellationToken);

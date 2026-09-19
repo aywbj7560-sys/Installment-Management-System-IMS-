@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using IMS.Domain.Enums;
 namespace IMS.Application.Contracts;
 
@@ -34,6 +35,19 @@ public sealed class ContractRequest
     }
 }
 public sealed record ContractItemRequest(long ProductId, int Quantity, decimal? UnitPrice);
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed class ActivateContractRequest
+{
+    public bool DownPaymentConfirmed { get; init; }
+    [StringLength(100)] public string? Reference { get; init; }
+    public string? Note { get; init; }
+    public Dictionary<string,string[]> Validate()
+    {
+        var errors = ContractValidation.Fields(this);
+        if (!DownPaymentConfirmed) errors[nameof(DownPaymentConfirmed)] = ["Confirm receipt of the agreed down payment."];
+        return errors;
+    }
+}
 public sealed class NewGuarantorRequest
 {
     [Required,StringLength(150)] public string FullName {get;init;}="";
@@ -73,6 +87,7 @@ public sealed record ContractResult(ContractDetails? Contract,int ErrorStatus=0,
 public interface IContractService
 {
     Task<ContractResult> CreateAsync(ContractRequest request,long userId,CancellationToken cancellationToken);
+    Task<ContractResult> ActivateAsync(long id,ActivateContractRequest request,long userId,CancellationToken cancellationToken);
     Task<ContractDetails?> GetAsync(long id,CancellationToken cancellationToken);
     Task<ContractPage> ListAsync(string? search,long? customerId,ContractStatus? status,int page,int pageSize,CancellationToken cancellationToken);
 }

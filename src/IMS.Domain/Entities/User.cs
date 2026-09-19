@@ -16,4 +16,6 @@ public class User
     public ICollection<Contract> CreatedContracts { get; set; } = new List<Contract>();
 
     public ICollection<Payment> ReceivedPayments { get; set; } = new List<Payment>();
+
+    public ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
 }

@@ -70,9 +70,36 @@ public class ContractDockerTests
             // Historical item prices stay locked after catalog changes.
             p1.CashPrice=999;await db.SaveChangesAsync();
             Assert.Equal(25m,(await client.GetFromJsonAsync<ContractDetails>(created.Headers.Location))!.Items[0].UnitPrice);
+
+            var before=await client.GetFromJsonAsync<ContractDetails>(created.Headers.Location);
+            var activated=await client.PostAsJsonAsync($"/api/contracts/{id}/activate",new ActivateContractRequest { DownPaymentConfirmed=true,Reference=key,Note="Live activation" });
+            Assert.Equal(HttpStatusCode.OK,activated.StatusCode);
+            var after=(await activated.Content.ReadFromJsonAsync<ContractDetails>())!;
+            Assert.Equal("Active",after.Contract.Status);
+            Assert.Equal(before!.Contract with { Status="Active" },after.Contract);
+            Assert.Equal(System.Text.Json.JsonSerializer.Serialize(before.Items),System.Text.Json.JsonSerializer.Serialize(after.Items));
+            Assert.Equal(System.Text.Json.JsonSerializer.Serialize(before.Guarantors),System.Text.Json.JsonSerializer.Serialize(after.Guarantors));
+            Assert.Equal(System.Text.Json.JsonSerializer.Serialize(before.Installments),System.Text.Json.JsonSerializer.Serialize(after.Installments));
+            var audit=Assert.Single(await db.AuditLogs.AsNoTracking().Where(x=>x.TargetEntityId==id&&x.ActionType=="ContractActivated").ToListAsync());
+            Assert.Equal(auth.User.Id,audit.UserId);Assert.Equal("Contract",audit.TargetEntityType);Assert.Equal("Draft",audit.PreviousState);Assert.Equal("Active",audit.NewState);
+            Assert.Equal(key,audit.Reference);Assert.Equal("Live activation",audit.Note);Assert.Equal(DateTimeKind.Utc,audit.Timestamp.Kind);
+            Assert.Equal(HttpStatusCode.Conflict,(await client.PostAsJsonAsync($"/api/contracts/{id}/activate",new ActivateContractRequest { DownPaymentConfirmed=true })).StatusCode);
+            Assert.Single(await db.AuditLogs.AsNoTracking().Where(x=>x.TargetEntityId==id&&x.ActionType=="ContractActivated").ToListAsync());
+
+            var raceCreated=await client.PostAsJsonAsync("/api/contracts",Request("race",guarantorId:details.Guarantors[0].GuarantorId));
+            Assert.Equal(HttpStatusCode.Created,raceCreated.StatusCode);
+            var raceId=(await raceCreated.Content.ReadFromJsonAsync<ContractDetails>())!.Contract.ContractId;
+            var attempts=await Task.WhenAll(
+                client.PostAsJsonAsync($"/api/contracts/{raceId}/activate",new ActivateContractRequest { DownPaymentConfirmed=true }),
+                client.PostAsJsonAsync($"/api/contracts/{raceId}/activate",new ActivateContractRequest { DownPaymentConfirmed=true }));
+            Assert.Single(attempts,x=>x.StatusCode==HttpStatusCode.OK);
+            Assert.Single(attempts,x=>x.StatusCode==HttpStatusCode.Conflict);
+            Assert.Single(await db.AuditLogs.AsNoTracking().Where(x=>x.TargetEntityId==raceId&&x.ActionType=="ContractActivated").ToListAsync());
         }
         finally
         {
+            var contractIds=await db.Contracts.Where(x=>x.CustomerId==customer.CustomerId).Select(x=>x.ContractId).ToListAsync();
+            await db.AuditLogs.Where(x=>x.TargetEntityType=="Contract"&&contractIds.Contains(x.TargetEntityId)).ExecuteDeleteAsync();
             await db.Contracts.Where(x=>x.CustomerId==customer.CustomerId).ExecuteDeleteAsync();
             await db.Guarantors.Where(x=>x.IdentificationNumber.StartsWith(key)).ExecuteDeleteAsync();
             await db.Products.Where(x=>x.ProductId==p1.ProductId||x.ProductId==p2.ProductId).ExecuteDeleteAsync();

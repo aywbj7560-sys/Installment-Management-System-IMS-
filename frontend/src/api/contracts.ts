@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { ContractDetails, ContractPage, ContractQuery, ContractRequest } from '../types/contracts';
+import type { ActivateContractRequest, ContractDetails, ContractPage, ContractQuery, ContractRequest } from '../types/contracts';
 
 export function getContracts(query: ContractQuery, token: string) {
   const params = new URLSearchParams();
@@ -11,3 +11,4 @@ export function getContracts(query: ContractQuery, token: string) {
 }
 export const getContract = (id: number, token: string) => apiRequest<ContractDetails>(`/api/contracts/${id}`, {}, token);
 export const createContract = (request: ContractRequest, token: string) => apiRequest<ContractDetails>('/api/contracts', { method: 'POST', body: JSON.stringify(request) }, token);
+export const activateContract = (id: number, request: ActivateContractRequest, token: string) => apiRequest<ContractDetails>(`/api/contracts/${id}/activate`, { method: 'POST', body: JSON.stringify(request) }, token);

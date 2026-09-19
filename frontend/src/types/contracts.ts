@@ -21,3 +21,6 @@ export interface ContractRequest {
   contractNumber: string; customerId: number; contractDate: string; downPayment: number;
   items: ContractItemRequest[]; guarantorId: number; guarantor: null; guaranteeNotes: string | null;
 }
+export interface ActivateContractRequest {
+  downPaymentConfirmed: boolean; reference: string | null; note: string | null;
+}

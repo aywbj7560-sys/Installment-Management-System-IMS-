@@ -8,3 +8,6 @@ export const canReadPayments = (role: Role) => canCreatePayments(role) || role =
 export const canCreateGuarantors = (role: Role) => role === 'Admin' || role === 'Financial Manager' || role === 'Sales Agent';
 export const canEditGuarantors = canCreateGuarantors;
 export const canReadCollections = (role: Role) => role === 'Admin' || role === 'Financial Manager' || role === 'Collection Officer';
+export const canReadCoreReports = (role: Role) => role === 'Admin' || role === 'Financial Manager' || role === 'Auditor';
+export const canReadCollectionReports = (role: Role) => canReadCoreReports(role) || role === 'Collection Officer';
+export const canReadReports = canReadCollectionReports;

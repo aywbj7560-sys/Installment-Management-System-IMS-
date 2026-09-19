@@ -7,3 +7,4 @@ export const canCreatePayments = (role: Role) => role === 'Admin' || role === 'F
 export const canReadPayments = (role: Role) => canCreatePayments(role) || role === 'Auditor';
 export const canCreateGuarantors = (role: Role) => role === 'Admin' || role === 'Financial Manager' || role === 'Sales Agent';
 export const canEditGuarantors = canCreateGuarantors;
+export const canReadCollections = (role: Role) => role === 'Admin' || role === 'Financial Manager' || role === 'Collection Officer';

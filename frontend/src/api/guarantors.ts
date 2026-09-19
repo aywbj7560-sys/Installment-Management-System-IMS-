@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { GuarantorPage, GuarantorQuery } from '../types/guarantors';
+import type { Guarantor, GuarantorDetails, GuarantorPage, GuarantorQuery, GuarantorRequest } from '../types/guarantors';
 
 export function getGuarantors(query: GuarantorQuery, token: string) {
   const params = new URLSearchParams();
@@ -8,3 +8,6 @@ export function getGuarantors(query: GuarantorQuery, token: string) {
   params.set('page', String(query.page ?? 1)); params.set('pageSize', String(query.pageSize ?? 10));
   return apiRequest<GuarantorPage>(`/api/guarantors?${params}`, {}, token);
 }
+export const getGuarantor = (id: number, token: string) => apiRequest<GuarantorDetails>(`/api/guarantors/${id}`, {}, token);
+export const createGuarantor = (request: GuarantorRequest, token: string) => apiRequest<Guarantor>('/api/guarantors', { method: 'POST', body: JSON.stringify(request) }, token);
+export const updateGuarantor = (id: number, request: GuarantorRequest, token: string) => apiRequest<Guarantor>(`/api/guarantors/${id}`, { method: 'PUT', body: JSON.stringify(request) }, token);

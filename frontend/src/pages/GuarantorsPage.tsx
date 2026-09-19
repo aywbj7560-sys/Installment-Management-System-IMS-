@@ -1,0 +1,20 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { getGuarantors } from '../api/guarantors';
+import { useAuth } from '../auth/AuthContext';
+import { ActiveStatusBadge } from '../components/ActiveStatusBadge';
+import { Pagination } from '../components/Pagination';
+import type { GuarantorPage } from '../types/guarantors';
+import { canCreateGuarantors, canEditGuarantors } from '../utils/roles';
+
+type ActiveFilter = '' | 'true' | 'false';
+export function GuarantorsPage() {
+  const { token, user } = useAuth(); const [search, setSearch] = useState(''); const [query, setQuery] = useState(''); const [active, setActive] = useState<ActiveFilter>(''); const [page, setPage] = useState(1); const [data, setData] = useState<GuarantorPage>(); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [retry, setRetry] = useState(0);
+  useEffect(() => { const timer = setTimeout(() => { setQuery(search.trim()); setPage(1); }, 350); return () => clearTimeout(timer); }, [search]);
+  useEffect(() => { if (!token) return; let current = true; setLoading(true); setError(''); getGuarantors({ search: query || undefined, isActive: active === '' ? undefined : active === 'true', page, pageSize: 10 }, token).then(result => { if (current) setData(result); }).catch(() => { if (current) setError('Guarantors could not be loaded. Please try again.'); }).finally(() => { if (current) setLoading(false); }); return () => { current = false; }; }, [token, query, active, page, retry]);
+  const reset = () => { setSearch(''); setQuery(''); setActive(''); setPage(1); };
+  return <section><div className="page-title"><div><p className="eyebrow">Guarantor management</p><h1>Guarantors</h1><p>View contact, employment, and future contract eligibility information.</p></div>{user && canCreateGuarantors(user.role) && <Link className="button-link primary" to="/guarantors/new">Add guarantor</Link>}</div>
+    <div className="panel filters"><label>Search<input aria-label="Search guarantors" value={search} maxLength={150} placeholder="Name, identification, phone, or ID" onChange={event => setSearch(event.target.value)} /></label><label>Status<select aria-label="Guarantor status" value={active} onChange={event => { setActive(event.target.value as ActiveFilter); setPage(1); }}><option value="">All statuses</option><option value="true">Active</option><option value="false">Inactive</option></select></label><button className="secondary" onClick={reset}>Clear filters</button></div>
+    {loading ? <div className="inline-state">Loading guarantors…</div> : error ? <div className="panel error-state" role="alert"><h2>Unable to load guarantors</h2><p>{error}</p><button className="secondary" onClick={() => setRetry(value => value + 1)}>Try again</button></div> : !data?.items.length ? <div className="panel empty-state"><h2>No guarantors found</h2><p>Try changing the search or active-status filter.</p></div> : <div className="panel table-panel"><div className="table-scroll"><table><thead><tr><th>ID</th><th>Full name</th><th>Identification</th><th>Phone</th><th>Secondary phone</th><th>Occupation</th><th>Workplace</th><th>Status</th><th>Actions</th></tr></thead><tbody>{data.items.map(guarantor => <tr key={guarantor.guarantorId}><td>{guarantor.guarantorId}</td><td><Link to={`/guarantors/${guarantor.guarantorId}`}>{guarantor.fullName}</Link></td><td>{guarantor.identificationNumber}</td><td>{guarantor.phone}</td><td>{guarantor.secondaryPhone || '—'}</td><td>{guarantor.occupation || '—'}</td><td>{guarantor.workplace || '—'}</td><td><ActiveStatusBadge isActive={guarantor.isActive} /></td><td className="actions"><Link to={`/guarantors/${guarantor.guarantorId}`}>View</Link>{user && canEditGuarantors(user.role) && <Link to={`/guarantors/${guarantor.guarantorId}/edit`}>Edit</Link>}</td></tr>)}</tbody></table></div><Pagination page={data.page} pageSize={data.pageSize} totalCount={data.totalCount} onPage={setPage} /></div>}
+  </section>;
+}

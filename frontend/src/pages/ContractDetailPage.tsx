@@ -1,0 +1,28 @@
+import { useEffect, useState, type ReactNode } from 'react';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import { ApiError } from '../api/client';
+import { getContract } from '../api/contracts';
+import { useAuth } from '../auth/AuthContext';
+import { ActiveStatusBadge } from '../components/ActiveStatusBadge';
+import { ContractStatusBadge } from '../components/ContractStatusBadge';
+import type { ContractDetails } from '../types/contracts';
+import { formatMoney } from '../utils/format';
+
+export function ContractDetailPage() {
+  const { id } = useParams(); const location = useLocation(); const { token } = useAuth(); const notice = (location.state as { notice?: string } | null)?.notice;
+  const [details, setDetails] = useState<ContractDetails>(); const [loading, setLoading] = useState(true); const [error, setError] = useState<{ status: number; message: string }>();
+  useEffect(() => { if (!token) return; getContract(Number(id), token).then(setDetails).catch(reason => setError({ status: reason instanceof ApiError ? reason.status : 0, message: reason instanceof ApiError ? reason.message : 'Contract details could not be loaded.' })).finally(() => setLoading(false)); }, [id, token]);
+  if (loading) return <div className="inline-state">Loading contract…</div>;
+  if (error) return <div className="panel error-state"><p className="eyebrow">{error.status === 404 ? '404' : error.status === 403 ? '403' : 'Error'}</p><h1>{error.status === 404 ? 'Contract Not Found' : error.status === 403 ? 'Access Denied' : 'Unable to load contract'}</h1><p>{error.status === 404 ? 'The requested contract does not exist.' : error.status === 403 ? 'You do not have permission to view this contract.' : error.message}</p><Link to="/contracts">Back to contracts</Link></div>;
+  if (!details) return null; const contract = details.contract;
+  return <section>{notice && <div className="success-notice" role="status">{notice}</div>}<div className="page-title"><div><p className="eyebrow">Contract #{contract.contractId}</p><h1>{contract.contractNumber}</h1><p>{contract.customerName}</p></div><Link className="button-link secondary" to="/contracts">Back to contracts</Link></div>
+    <DetailSection title="Contract summary"><div className="details-grid"><Detail label="Contract ID" value={String(contract.contractId)} /><Detail label="Status" value={<ContractStatusBadge status={contract.status} />} /><Detail label="Contract number" value={contract.contractNumber} /><Detail label="Contract date" value={new Date(contract.contractDate).toLocaleDateString()} /><Detail label="Created by user ID" value={String(contract.createdByUserId)} /><Detail label="Created" value={new Date(contract.createdAt).toLocaleString()} /></div></DetailSection>
+    <DetailSection title="Customer"><div className="details-grid"><Detail label="Customer ID" value={String(contract.customerId)} /><Detail label="Customer name" value={contract.customerName} /></div></DetailSection>
+    <DetailSection title="Financial values"><div className="details-grid"><Detail label="Total amount" value={formatMoney(contract.totalAmount)} /><Detail label="Down payment" value={formatMoney(contract.downPayment)} /><Detail label="Remaining amount" value={formatMoney(contract.remainingAmount)} /><Detail label="Installments" value={String(contract.numberOfInstallments)} /></div></DetailSection>
+    <DetailSection title="Product items"><div className="table-scroll"><table><thead><tr><th>Product</th><th>Code</th><th>Quantity</th><th>Unit price</th><th>Subtotal</th></tr></thead><tbody>{details.items.map(item => <tr key={item.contractItemId}><td>{item.productName}</td><td>{item.productCode}</td><td>{item.quantity}</td><td className="numeric">{formatMoney(item.unitPrice)}</td><td className="numeric">{formatMoney(item.subtotal)}</td></tr>)}</tbody></table></div></DetailSection>
+    <DetailSection title="Guarantor">{details.guarantors.map(value => <div className="details-grid guarantor-block" key={value.guarantorId}><Detail label="Name" value={value.fullName} /><Detail label="Status" value={<ActiveStatusBadge isActive={value.isActive} />} /><Detail label="Identification" value={value.identificationNumber} /><Detail label="Phone" value={value.phone} /><Detail label="Secondary phone" value={value.secondaryPhone || '—'} /><Detail label="Address" value={value.address} /><Detail label="Occupation" value={value.occupation || '—'} /><Detail label="Workplace" value={value.workplace || '—'} /><Detail label="Profile notes" value={value.notes || '—'} wide /><Detail label="Guarantee notes" value={value.guaranteeNotes || '—'} wide /></div>)}</DetailSection>
+    <DetailSection title="Installment schedule"><div className="table-scroll"><table><thead><tr><th>No.</th><th>Due date</th><th>Amount</th><th>Paid</th><th>Remaining</th><th>Status</th></tr></thead><tbody>{details.installments.map(value => <tr key={value.installmentId}><td>{value.installmentNumber}</td><td>{value.dueDate}</td><td className="numeric">{formatMoney(value.amount)}</td><td className="numeric">{formatMoney(value.paidAmount)}</td><td className="numeric">{formatMoney(value.remainingAmount)}</td><td><span className="status-badge status-inactive">{value.status}</span></td></tr>)}</tbody></table></div></DetailSection>
+  </section>;
+}
+function DetailSection({ title, children }: { title: string; children: ReactNode }) { return <section className="panel detail-section"><h2>{title}</h2>{children}</section>; }
+function Detail({ label, value, wide }: { label: string; value: ReactNode; wide?: boolean }) { return <div className={wide ? 'detail-wide' : ''}><span>{label}</span><strong>{value}</strong></div>; }

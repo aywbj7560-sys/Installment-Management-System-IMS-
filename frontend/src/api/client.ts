@@ -9,8 +9,8 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}, token?
     const response = await fetch(`${baseUrl}${path}`, { ...init, headers: { 'Content-Type': 'application/json', ...init.headers, ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
     if (!response.ok) {
       if (response.status === 401) unauthorizedHandler?.();
-      const body = await response.json().catch(() => ({})) as { message?: string; errors?: Record<string, string[]> };
-      throw new ApiError(response.status, response.status === 403 ? 'You do not have permission to perform this action.' : body.message || 'The request could not be completed.', body.errors ?? {});
+      const body = await response.json().catch(() => ({})) as { message?: string; detail?: string; errors?: Record<string, string[]> };
+      throw new ApiError(response.status, response.status === 403 ? 'You do not have permission to perform this action.' : body.message || body.detail || 'The request could not be completed.', body.errors ?? {});
     }
     return response.json() as Promise<T>;
   } catch (error) {

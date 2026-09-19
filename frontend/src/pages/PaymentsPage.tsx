@@ -1,0 +1,21 @@
+import { useEffect, useState } from 'react';
+import { Link, Navigate } from 'react-router-dom';
+import { getPayments } from '../api/payments';
+import { useAuth } from '../auth/AuthContext';
+import { Pagination } from '../components/Pagination';
+import type { PaymentPage } from '../types/payments';
+import { formatMoney } from '../utils/format';
+import { canCreatePayments, canReadPayments } from '../utils/roles';
+
+function positiveId(value: string) { return /^\d+$/.test(value) && Number(value) > 0 ? Number(value) : undefined; }
+export function PaymentsPage() {
+  const { token, user } = useAuth(); const [search, setSearch] = useState(''); const [query, setQuery] = useState(''); const [contractId, setContractId] = useState(''); const [customerId, setCustomerId] = useState(''); const [page, setPage] = useState(1); const [data, setData] = useState<PaymentPage>(); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [retry, setRetry] = useState(0);
+  useEffect(() => { const timer = setTimeout(() => { setQuery(search.trim()); setPage(1); }, 350); return () => clearTimeout(timer); }, [search]);
+  useEffect(() => { if (!token || !user || !canReadPayments(user.role)) return; let current = true; setLoading(true); setError(''); getPayments({ search: query || undefined, contractId: positiveId(contractId), customerId: positiveId(customerId), page, pageSize: 10 }, token).then(result => { if (current) setData(result); }).catch(() => { if (current) setError('Payments could not be loaded. Please try again.'); }).finally(() => { if (current) setLoading(false); }); return () => { current = false; }; }, [token, user, query, contractId, customerId, page, retry]);
+  if (!user || !canReadPayments(user.role)) return <Navigate to="/access-denied" replace />;
+  const reset = () => { setSearch(''); setQuery(''); setContractId(''); setCustomerId(''); setPage(1); };
+  return <section><div className="page-title"><div><p className="eyebrow">Payment management</p><h1>Payments</h1><p>Review receipts recorded against installment contracts.</p></div>{canCreatePayments(user.role) && <Link className="button-link primary" to="/payments/new">Record payment</Link>}</div>
+    <div className="panel filters payment-filters"><label>Search<input aria-label="Search payments" value={search} maxLength={150} placeholder="Reference or payment method" onChange={event => setSearch(event.target.value)} /></label><label>Contract ID<input aria-label="Payment contract ID" inputMode="numeric" value={contractId} onChange={event => { setContractId(event.target.value.replace(/\D/g, '')); setPage(1); }} /></label><label>Customer ID<input aria-label="Payment customer ID" inputMode="numeric" value={customerId} onChange={event => { setCustomerId(event.target.value.replace(/\D/g, '')); setPage(1); }} /></label><button className="secondary" onClick={reset}>Clear filters</button></div>
+    {loading ? <div className="inline-state">Loading payments…</div> : error ? <div className="panel error-state" role="alert"><h2>Unable to load payments</h2><p>{error}</p><button className="secondary" onClick={() => setRetry(value => value + 1)}>Try again</button></div> : !data?.items.length ? <div className="panel empty-state"><h2>No payments found</h2><p>Try changing the supported reference, method, contract, or customer filters.</p></div> : <div className="panel table-panel"><div className="table-scroll"><table><thead><tr><th>ID</th><th>Reference</th><th>Contract ID</th><th>Payment date</th><th>Amount</th><th>Method</th><th>Received by</th><th>Action</th></tr></thead><tbody>{data.items.map(payment => <tr key={payment.paymentId}><td>{payment.paymentId}</td><td><Link to={`/payments/${payment.paymentId}`}>{payment.paymentReference}</Link></td><td>{payment.contractId}</td><td>{new Date(payment.paymentDate).toLocaleString()}</td><td className="numeric">{formatMoney(payment.amount)}</td><td>{payment.paymentMethod}</td><td>User #{payment.receivedByUserId}</td><td><Link to={`/payments/${payment.paymentId}`}>View</Link></td></tr>)}</tbody></table></div><Pagination page={data.page} pageSize={data.pageSize} totalCount={data.totalCount} onPage={setPage} /></div>}
+  </section>;
+}

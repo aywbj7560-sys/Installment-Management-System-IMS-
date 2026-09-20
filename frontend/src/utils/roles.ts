@@ -11,3 +11,4 @@ export const canReadCollections = (role: Role) => role === 'Admin' || role === '
 export const canReadCoreReports = (role: Role) => role === 'Admin' || role === 'Financial Manager' || role === 'Auditor';
 export const canReadCollectionReports = (role: Role) => canReadCoreReports(role) || role === 'Collection Officer';
 export const canReadReports = canReadCollectionReports;
+export const canManageUsers = (role: Role) => role === 'Admin';
